@@ -31,13 +31,33 @@ func (wp *WorkerPool) worker(id int) {
 	for {
 		select {
 		case job := <-wp.JobQueue:
-			fmt.Printf("[🔥] - Worker %d processing %s\n", id, job.ID)
+
+			maxAttempts := 3
+
+			for attempt := 1; attempt <= maxAttempts; attempt++ {
+				fmt.Printf("[🔥] - Worker %d processing %s (attempt %d)\n", id, job.ID, attempt)
+				err := processJob(job)
+				if err == nil {
+					break
+				}
+
+				// backoff
+				time.Sleep(time.Second * time.Duration(attempt))
+			}
 			time.Sleep(time.Millisecond * 500) // simulate work
 		case <-wp.Quit:
-			fmt.Printf("[🧶]Worker %d stopping... \n", id)
+			fmt.Printf(" -- Worker %d stopping... -- \n", id)
 			return
 		}
 	}
+}
+
+func processJob(job Job) error {
+	// Simulate failure for testing
+	if job.ID == "Job-5" {
+		return fmt.Errorf("🚧 failed 🚧")
+	}
+	return nil
 }
 
 func (wp *WorkerPool) Start() {
