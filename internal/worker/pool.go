@@ -72,6 +72,9 @@ func (wp *WorkerPool) AddJob(jobID string) {
 }
 
 func (wp *WorkerPool) Stop() {
+	fmt.Println("Stopping worker pool...")
 	close(wp.Quit)
+	close(wp.JobQueue)
 	wp.wg.Wait()
+	fmt.Println("All workers stopped.")
 }
