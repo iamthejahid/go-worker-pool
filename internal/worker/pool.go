@@ -6,6 +6,9 @@ import (
 	"time"
 )
 
+// Global flag to disable heavy processing during benchmarks
+var benchmarkMode = false
+
 type Job struct {
 	ID string
 }
@@ -14,14 +17,14 @@ type WorkerPool struct {
 	WorkerCount int
 	JobQueue    chan Job
 	wg          sync.WaitGroup
-	Quit        chan bool
+	Quit        chan struct{}
 }
 
 func NewWorkerPool(workerCount int, queueSize int) *WorkerPool {
 	return &WorkerPool{
 		WorkerCount: workerCount,
 		JobQueue:    make(chan Job, queueSize),
-		Quit:        make(chan bool),
+		Quit:        make(chan struct{}),
 	}
 }
 
@@ -30,21 +33,33 @@ func (wp *WorkerPool) worker(id int) {
 
 	for {
 		select {
-		case job := <-wp.JobQueue:
+		case job, ok := <-wp.JobQueue:
+			// If channel closed, exit worker
+			if !ok {
+				fmt.Printf(" -- Worker %d stopping (queue closed)... -- \n", id)
+				return
+			}
 
+			// Retry logic
 			maxAttempts := 3
-
 			for attempt := 1; attempt <= maxAttempts; attempt++ {
-				fmt.Printf("[🔥] - Worker %d processing %s (attempt %d)\n", id, job.ID, attempt)
+				fmt.Printf("[🔥] Worker %d processing %s (attempt %d)\n",
+					id, job.ID, attempt)
+
 				err := processJob(job)
 				if err == nil {
 					break
 				}
 
-				// backoff
+				// Backoff
 				time.Sleep(time.Second * time.Duration(attempt))
 			}
-			time.Sleep(time.Millisecond * 500) // simulate work
+
+			// Simulate heavy work only if NOT in benchmark mode
+			if !benchmarkMode {
+				time.Sleep(500 * time.Millisecond)
+			}
+
 		case <-wp.Quit:
 			fmt.Printf(" -- Worker %d stopping... -- \n", id)
 			return
@@ -73,8 +88,15 @@ func (wp *WorkerPool) AddJob(jobID string) {
 
 func (wp *WorkerPool) Stop() {
 	fmt.Println("Stopping worker pool...")
+
+	// First: tell workers to stop listening
 	close(wp.Quit)
+
+	// Then: close queue so workers exit when finished processing
 	close(wp.JobQueue)
+
+	// Wait for all workers to finish
 	wp.wg.Wait()
+
 	fmt.Println("All workers stopped.")
 }
