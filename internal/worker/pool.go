@@ -31,10 +31,10 @@ func (wp *WorkerPool) worker(id int) {
 	for {
 		select {
 		case job := <-wp.JobQueue:
-			fmt.Printf("Worker <%d> processing |%s|\n", id, job.ID)
+			fmt.Printf("[🔥] - Worker %d processing %s\n", id, job.ID)
 			time.Sleep(time.Millisecond * 500) // simulate work
 		case <-wp.Quit:
-			fmt.Printf("Worker <%d> stopping...\n", id)
+			fmt.Printf("[🧶]Worker %d stopping... \n", id)
 			return
 		}
 	}
